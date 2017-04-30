@@ -1,0 +1,57 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: work-tunnel
+  labels:
+    commit: ${WERCKER_GIT_COMMIT}
+spec:
+  revisionHistoryLimit: 1
+  replicas: 1
+  selector:
+    matchLabels:
+      app: work-tunnel
+  template:
+    metadata:
+      labels:
+        app: work-tunnel
+        commit: ${WERCKER_GIT_COMMIT}
+    spec:
+      containers:
+      - name: sshd-server
+        image: quay.io/cehoffman/work-tunnel:${WERCKER_GIT_BRANCH}-${WERCKER_GIT_COMMIT}
+        ports:
+        - name: sshd
+          containerPort: 22
+          protocol: TCP
+        - name: vpn
+          containerPort: 1194
+          protocol: TCP
+        volumeMounts:
+        - name: keys
+          mountPath: /etc/sshd/
+          readOnly: true
+      volumes:
+      - name: keys
+        secret:
+          secretName: work-tunnel-keys
+          defaultMode: 0400
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: work-tunnel
+  labels:
+    app: work-tunnel
+    commit: ${WERCKER_GIT_COMMIT}
+spec:
+  ports:
+  - name: sshd
+    port: 22
+    targetPort: 22
+  - name: vpn
+    port: 1194
+    targetPort: 1194
+  selector:
+    app: work-tunnel
+    commit: ${WERCKER_GIT_COMMIT}
+  type: LoadBalancer

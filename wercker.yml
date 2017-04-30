@@ -1,0 +1,42 @@
+box:
+  id: alpine
+  cmd: /bin/sh
+
+build:
+  steps:
+    - script:
+        name: install dependencies
+        code: |
+          apk --update add openssh patch
+          patch -d /etc/ssh -p1 < sshd_config.patch
+          apk del patch
+          addgroup choffman
+          adduser -s /bin/sh -G choffman choffman < /dev/null || true
+          echo 'choffman:8;zoPEqzzW&WUf4xNcfY' | chpasswd
+          mkdir /home/choffman/.ssh/
+          mv authorized_keys /home/choffman/.ssh/
+          chown choffman:choffman /home/choffman/.ssh/authorized_keys
+          chmod 600 /home/choffman/.ssh/authorized_keys
+
+    - internal/docker-push:
+        username: cehoffman+wercker
+        password: $QUAY_ROBOT_PASSWORD
+        ports: "22/tcp,1194/tcp"
+        entrypoint: /usr/sbin/sshd
+        cmd: -D -e
+        tag: $WERCKER_GIT_BRANCH-$WERCKER_GIT_COMMIT
+        repository: quay.io/cehoffman/work-tunnel
+        registry: https://quay.io/v2
+
+deploy:
+  box: google/cloud-sdk
+  steps:
+    - bash-template
+
+    - script:
+        name: deploy
+        code: |
+          echo "$GKE_AUTH_JSON" > /auth.json
+          gcloud auth activate-service-account --key-file /auth.json
+          gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
+          kubectl apply -f deployment.yml
