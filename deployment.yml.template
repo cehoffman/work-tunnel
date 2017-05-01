@@ -30,6 +30,13 @@ spec:
         - name: keys
           mountPath: /etc/sshd/
           readOnly: true
+        resources:
+          requests:
+            memory: "2Mi"
+            cpu: "5m"
+          limits:
+            cpu: "20m"
+            memory: "4Mi"
       volumes:
       - name: keys
         secret:
